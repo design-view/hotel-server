@@ -1,0 +1,90 @@
+//common js 구문
+//모듈 import ---> require("모듈")
+//express 
+const express = require("express");
+const cors = require("cors");
+const mysql = require("mysql");
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+
+
+//서버 생성
+const app = express();
+// 프로세서의 주소 포트번호
+const port = 8080;
+const multer = require("multer");
+// 브라우져의 cors이슈를 막기 위해 설정
+app.use(cors());
+app.use("/upload", express.static("upload"));
+// json형식 데이터를 처리하도록 설정
+app.use(express.json());
+// upload폴더 클라이언트에서 접근 가능하도록 설정
+
+//diskStorage() ---> 파일을 저장할때의 모든 제어 기능을 제공
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'upload/event/');
+    },
+    filename: (req,file,cb)=>{
+        const newFilename = file.originalname;
+        cb(null, newFilename);
+    }
+})
+const upload = multer({ storage: storage });
+//post요청이 왔을때 응답처리
+app.post('/upload', upload.single('file'), (req, res) => {
+    res.send({
+        imageUrl: req.file.filename
+    })
+});
+// mysql연결 생성
+const conn = mysql.createConnection({
+    host: "hera-database.c75lp1ufvzs3.us-east-1.rds.amazonaws.com",
+    user: "admin",
+    password: "skymin0235",
+    port: "3306",
+    database: "hotel"
+})
+// 선연결
+conn.connect();
+// conn.query("쿼리문", 콜백함수)
+app.get("/special", (req, res)=>{
+    conn.query("select * from event where e_category = 'special'",
+    (error, result, fields)=>{
+        res.send(result)
+    })
+})
+//http://localhost:8080/special/1
+// req { params: { no: 1 }}
+app.get("/special/:no", (req, res)=>{
+    const {no} = req.params;
+    conn.query(`select * from event where e_category = 'special' and e_no=${no}`,
+    (error, result, fields)=>{
+        res.send(result)
+    })
+})
+//회원가입
+app.post("/join",async (req, res)=>{
+    let myPlanintextPass = req.body.userpass;
+    let myPass = "";
+    if(myPlanintextPass != '' && myPlanintextPass != undefined){
+        bcrypt.genSalt(saltRounds, function(err,salt){
+            bcrypt.hash(myPlanintextPass,salt, function(err,hash){
+                myPass = hash;
+                const { username, userpass, userphone,userorg,useremail } = req.body;
+                console.log(req.body)
+                connection.query("insert into customer_members(`username`, `userpass`, `userphone`,  `userorg`,`usermail`,`regdate`) values(?,?,?,?,?,DATE_FORMAT(now(),'%Y-%m-%d'))",
+                    [username, myPass, userphone,userorg,useremail] ,
+                    (err,result,fields )=>{
+                    console.log(result)
+                    console.log(err)
+                    res.send("등록 되었습니다.")
+                })
+            })
+        })
+    }   
+})
+
+app.listen(port, ()=>{
+    console.log("서버가 동작하고 있습니다.")
+})
