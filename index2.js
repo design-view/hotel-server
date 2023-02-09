@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
 })
 const upload = multer({ storage: storage });
 //post요청이 왔을때 응답처리
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/upload', upload.single('img'), (req, res) => {
     res.send({
         imageUrl: req.file.filename
     })
@@ -47,10 +47,16 @@ const conn = mysql.createConnection({
 // 선연결
 conn.connect();
 // conn.query("쿼리문", 콜백함수)
-app.get("/special", (req, res)=>{
-    conn.query("select * from event where e_category = 'special'",
+app.get("/specials/:limits", (req, res)=>{
+    const { limits } = req.params;
+    conn.query(`select * from event where e_category = 'special' limit ${limits}`,
     (error, result, fields)=>{
-        res.send(result)
+        if(result){
+            res.send(result)
+        }else {
+            console.log(error);
+        }
+       
     })
 })
 //http://localhost:8080/special/1
@@ -62,6 +68,14 @@ app.get("/special/:no", (req, res)=>{
         res.send(result)
     })
 })
+//객실 데이터 불러오기 
+app.get("/room", async (req, res) => {
+    conn.query('select * from guestroom',(err,result,fields) => {
+        res.send(result);
+    })
+})
+
+
 
 //회원가입 요청
 app.post("/join", async (req, res) => {
@@ -94,24 +108,111 @@ app.post("/join", async (req, res) => {
 })
 
 //로그인 요청
-app.post('/login', async (req, res)=>{
-    const { usermail, userpass } = req.body;
-    conn.query(`select * from member where m_email = '${usermail}'`, (err, resu, fields)=>{
-        if(resu == undefined || resu[0] == undefined ){
-            console.log("없습니다.");
-            console.log(err);
-            res.send("no");
-        }else {
-            bcrypt.compare(userpass, resu[0].m_pass, function(err,result){
-                if(result){
-                    res.send(resu[0]);
+app.post("/login", async (req, res) => {
+    //1)useremail값에 일치하는 데이터가 있는지 확인
+    //2)userpass 암호화해서 쿼리 결과의 패스워드랑 일치하는지 체크 
+    //{ "useremail": "admin@naver.com", "userpass": "1234" }
+    const { useremail, userpass } = req.body;
+    conn.query(`select * from member where m_email = '${useremail}'`, 
+    (err, result, fields)=>{
+        //결과가 undefined가 아니고 결과의 0번째가 undefined가 아닐때 
+        //결과가 있을때 
+        if(result != undefined && result[0] != undefined){
+            bcrypt.compare(userpass, result[0].m_pass, function(err, rese){
+                //result == true
+                if(rese){
+                    console.log("로그인 성공");
+                    res.send(result);
                 }else {
-                    res.send("no");
+                    console.log("로그인 실패");
+                    res.send("실패");
                 }
             })
+        }else {
+            console.log("데이터가 없습니다.");
         }
     })
 })
+//아이디 찾기 요청
+app.post("/findid",async (req, res) => {
+    const { m_name, m_phone} = req.body;
+    conn.query(`select * from member where m_name='${m_name}' and m_phone='${m_phone}'`,(err, result, fields) => {
+        if(result){
+            console.log(result[0].m_email);
+            res.send(result[0].m_email);
+        }
+        console.log(err);
+    })
+})
+//패스워드 찾기 요청
+app.post("/findpass",async (req, res) => {
+    const { m_name, m_email} = req.body;
+    conn.query(`select * from member where m_name='${m_name}' and m_email='${m_email}'`,(err, result, fields) => {
+        if(result){
+            res.send(result[0].m_email);
+        }
+        console.log(err);
+    })
+})
+//패스워드 변경 요청
+app.patch("/updatePw", async (req, res) => {
+    const { m_pass, m_email } = req.body;
+    //update 테이블 이름 
+    //set 필드이름=데이터값 
+    //where 조건절 update member set m_pass
+    const mytextpass = m_pass;
+    console.log()
+    let myPass = "";
+    if(mytextpass != '' && mytextpass != undefined){
+        bcrypt.genSalt(saltRounds, function(err, salt) {
+            //hash메소드 호출되면 인자로 넣어준 비밀번호를 암호화하여
+            // 콜백함수 안 hash로 돌려준다.
+            bcrypt.hash(mytextpass, salt, function(err, hash) {
+                myPass = hash;
+                //쿼리작성
+                conn.query(`update member set m_pass='${myPass}' where m_email='${m_email}'
+    `,(err, result, fields)=>{
+        if(result){
+            res.send("등록되었습니다.");
+            console.log(result);
+        }
+        console.log(err);
+    })
+            });
+        });
+    }
+})
+//이벤트 등록 요청
+app.post('/event', async (req, res) => {
+    const {e_title,e_time,e_titledesc,e_desc,e_category,e_img1,e_img2} = req.body;
+    //conn.query(insert into 테이블이름(필드명.....) values(값....),(err, res, fields)=>{})
+    //conn.query(insert into 테이블이름(필드명.....) values(?,?,?,?,?,?),[변수명,.....]
+    conn.query(`insert into event(e_title,e_time,e_titledesc,e_desc,e_category,e_img1,e_img2) values(?,?,?,?,?,?,?)`,
+    [e_title,e_time,e_titledesc,e_desc,e_category,e_img1,e_img2],(err, result, fields)=>{
+        if(result){
+            console.log(result);
+            res.send("ok");
+        }else {
+            console.log(err);
+        }
+    })
+})
+//객실등록요청
+app.post('/room',async (req, res)=>{
+    const {r_name,r_size,r_price,r_bed
+    ,r_amenity,r_desc,r_img1,r_img2,r_img3,r_img4} = req.body;
+    conn.query(`insert into guestroom(r_name,r_size,r_price,r_bed
+        ,r_amenity,r_desc,r_img1,r_img2,r_img3,r_img4) values(?,?,?,?,?,?,?,?,?,?)`,
+        [r_name,r_size,r_price,r_bed,r_amenity,r_desc,r_img1,r_img2,r_img3,r_img4],
+        (err, result, fields)=>{
+            if(result){
+                res.send("ok")
+            }else {
+                console.log(err);
+            }
+        })
+})
+
 app.listen(port, ()=>{
     console.log("서버가 동작하고 있습니다.")
 })
