@@ -96,11 +96,15 @@ app.get("/room", (req, res)=>{
         res.send(result)
     })
 })
+//객실 데이터 요청
 app.get("/room/:no", (req, res)=>{
     const {no} = req.params;
+    console.log(`번호는 ${no}`);
     conn.query(`select * from guestroom where r_no=${no}`,
     (error, result, fields)=>{
-        res.send(result[0])
+        res.send(result[0]);
+        console.log(result);
+        
     })
 })
 //http://localhost:8080/special/1
