@@ -213,6 +213,41 @@ app.post('/room',async (req, res)=>{
         })
 })
 
+//객실예약관련**********************************
+//객실예약조회 요청
+app.get("/searchRoom", async (req, res) => {
+    //쿼리스트링 데이터 받기
+    const { start ,end } = req.query;
+    // "2023-02-13"  "2023-02-16"
+    // select rv_roomno from reservation 
+    // where rv_checkin >= '${start}' and rv_checkin < '${end}'
+    conn.query(`select rv_roomno from 
+    reservation where rv_checkin >= '${start}' and rv_checkin < '${end}'`,(err, result, fields) => {
+        // [ {rv_roomno: '21'},{rv_roomno: '22'}] ----> ['21','22'] ---> [21,22]
+        result = result.map(re=> Number(re.rv_roomno))
+        console.log(result);
+        res.send(result);
+    })
+})
+//예약하기 요청
+app.post('/addReservation',async (req, res) => {
+    const {rv_email,rv_roomno,rv_checkin,rv_checkout,rv_adult,rv_child,
+        rv_desc,rv_phone,rv_name,
+        rv_roomname,rv_price} = req.body;
+    conn.query(`insert into reservation(rv_email,rv_roomno,rv_checkin,rv_checkout,rv_adult,rv_child,
+        rv_desc,rv_phone,rv_name,
+        rv_roomname,rv_price) values(?,?,?,?,?,?,?,?,?,?,?)`,[rv_email,rv_roomno,rv_checkin,rv_checkout,rv_adult,rv_child,
+            rv_desc,rv_phone,rv_name,
+            rv_roomname,rv_price],(err, result, fields) => {
+                if(result){
+                    console.log("ok");
+                }
+            })
+})
+
+
+
+
 app.listen(port, ()=>{
     console.log("서버가 동작하고 있습니다.")
 })
